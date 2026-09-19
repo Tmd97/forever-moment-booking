@@ -99,7 +99,8 @@ public class OutboxDeadLetterHandler {
     private void createAndPublishBookingFailed(BookingRequestEvent requestEvent, String reason) {
         // Use EventMapper to convert BookingRequestEvent -> BookingFailedEvent
         //TODO: need to send useremail, or experience Id
-        BookingFailedEvent bookingFailedEvent = (BookingFailedEvent) OutboundEventGenerator.buildOutboundEvent(null, requestEvent.getEventType(), requestEvent);
+        BookingFailedEvent bookingFailedEvent = (BookingFailedEvent) OutboundEventGenerator.buildOutboundEvent(
+                null, EventConstants.BOOKING_FAILED, requestEvent);
         OutgoingOutboxRecord record = outgoingOutboxService.createRecord(
                 requestEvent.getBookingId(),
                 EventConstants.BOOKING_FAILED,

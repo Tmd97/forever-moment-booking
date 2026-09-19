@@ -10,13 +10,12 @@ import java.time.LocalDateTime;
  * {@link com.forvmom.MomentForeverBooking.consumer.PaymentFailedConsumer}.
  */
 
-public class PaymentFailedEvent implements InboundEvent {
+public class PaymentFailedEvent extends BaseEvent implements InboundEvent {
 
     private String bookingId;
     private String failureReason;
     private String errorCode;
     private LocalDateTime failedAt;
-    private String eventType;
 
     public PaymentFailedEvent() {
     }
@@ -25,14 +24,6 @@ public class PaymentFailedEvent implements InboundEvent {
         return bookingId;
     }
 
-    @Override
-    public String getEventType() {
-        return eventType;
-    }
-
-    public void setEventType(String eventType) {
-        this.eventType = eventType;
-    }
     public void setBookingId(String bookingId) {
         this.bookingId = bookingId;
     }

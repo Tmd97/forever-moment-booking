@@ -3,9 +3,14 @@ package com.forvmom.MomentForeverBooking.commons;
 import com.forvmom.MomentForeverBooking.domain.entity.Booking;
 import com.forvmom.MomentForeverBooking.events.*;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 public class OutboundEventGenerator {
+
+    private static final String PRODUCER = "booking-service";
+    private static final int SCHEMA_VERSION = 1;
 
     public static OutboundEvent buildOutboundEvent(Booking booking, String eventType, InboundEvent inboundEvent) {
 
@@ -27,6 +32,7 @@ public class OutboundEventGenerator {
 
     private static OutboundEvent buildBookingConfirmedEvent(Booking booking, InboundEvent inboundEvent) {
         BookingConfirmedEvent e = new BookingConfirmedEvent();
+        applyIdentity(e, EventConstants.BOOKING_CONFIRMED, booking.getBookingId(), inboundEvent);
         e.setBookingId(booking.getBookingId());
         e.setConfirmedAt(LocalDateTime.now());
         e.setUserId(booking.getUserId());
@@ -39,6 +45,7 @@ public class OutboundEventGenerator {
 
     private static PaymentRequestedEvent buildPaymentRequestedEvent(Booking booking, InboundEvent inboundEvent) {
         PaymentRequestedEvent e = new PaymentRequestedEvent();
+        applyIdentity(e, EventConstants.PAYMENT_REQUESTED, booking.getBookingId(), inboundEvent);
         e.setBookingId(booking.getBookingId());
         e.setRequestedAt(LocalDateTime.now());
         e.setGrandTotal(booking.getGrandTotal());
@@ -57,12 +64,19 @@ public class OutboundEventGenerator {
         if(booking==null){
             //create minimal event with bookingId and failure reason
                 BookingFailedEvent bookingFailedEvent = new BookingFailedEvent();
+                applyIdentity(bookingFailedEvent, EventConstants.BOOKING_FAILED,
+                        inboundEvent.getBookingId(), inboundEvent);
                 bookingFailedEvent.setBookingId(inboundEvent.getBookingId());
+                if (inboundEvent instanceof BookingRequestEvent) {
+                    bookingFailedEvent.setBookingDate(
+                            ((BookingRequestEvent) inboundEvent).getBookingDate());
+                }
                 bookingFailedEvent.setFailedAt(LocalDateTime.now());
                 bookingFailedEvent.setFailureReason("Booking not found for id: " + inboundEvent.getBookingId());
                 return bookingFailedEvent;
         }
         BookingFailedEvent bookingFailedEvent = new BookingFailedEvent();
+        applyIdentity(bookingFailedEvent, EventConstants.BOOKING_FAILED, booking.getBookingId(), inboundEvent);
         bookingFailedEvent.setBookingId(booking.getBookingId());
         bookingFailedEvent.setFailedAt(LocalDateTime.now());
         bookingFailedEvent.setFailureReason("TO BE FILLED BY CALLER");
@@ -71,8 +85,23 @@ public class OutboundEventGenerator {
         bookingFailedEvent.setExperienceId(booking.getExperienceId());
         bookingFailedEvent.setTimeSlotMapperId(booking.getTimeSlotMapperId());
         bookingFailedEvent.setGuestCount(booking.getGuestCount());
+        if (booking.getBookingDate() != null) {
+            bookingFailedEvent.setBookingDate(booking.getBookingDate().toLocalDate());
+        }
         return bookingFailedEvent;
     }
 
-
+    private static void applyIdentity(BaseEvent event, String eventType, String bookingId,
+                                      InboundEvent inboundEvent) {
+        Instant now = Instant.now();
+        event.setEventId(UUID.randomUUID().toString());
+        event.setProducer(PRODUCER);
+        event.setSchemaVersion(SCHEMA_VERSION);
+        event.setOccurredAt(now);
+        event.setEventType(eventType);
+        event.setCorrelationId(inboundEvent.getCorrelationId() != null
+                ? inboundEvent.getCorrelationId()
+                : bookingId);
+        event.setCausationId(inboundEvent.getEventId());
+    }
 }

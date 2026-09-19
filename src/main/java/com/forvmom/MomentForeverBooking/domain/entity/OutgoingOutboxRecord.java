@@ -5,7 +5,9 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "outgoing_outbox_record")
+@Table(name = "outgoing_outbox_record", uniqueConstraints = {
+        @UniqueConstraint(name = "uq_outgoing_outbox_booking_event", columnNames = {"booking_id", "event_type"})
+})
 public class OutgoingOutboxRecord {
 
     public static final String STATUS_PENDING = "PENDING";

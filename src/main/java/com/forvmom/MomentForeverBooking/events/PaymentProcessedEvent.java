@@ -11,14 +11,13 @@ import java.time.LocalDateTime;
  * {@link com.forvmom.MomentForeverBooking.consumer.PaymentProcessedConsumer}.
  */
 
-public class PaymentProcessedEvent implements InboundEvent {
+public class PaymentProcessedEvent extends BaseEvent implements InboundEvent {
 
     private String bookingId;
     private String transactionId;
     private BigDecimal amountPaid;
     private String currency;
     private LocalDateTime paidAt;
-    private String eventType;
 
     public PaymentProcessedEvent() {
     }
@@ -26,18 +25,6 @@ public class PaymentProcessedEvent implements InboundEvent {
     public String getBookingId() {
         return bookingId;
     }
-
-    @Override
-    public String getEventType() {
-        return eventType;
-    }
-
-    public void setEventType(String eventType) {
-        this.eventType = eventType;
-    }
-
-
-
 
     public void setBookingId(String bookingId) {
         this.bookingId = bookingId;
