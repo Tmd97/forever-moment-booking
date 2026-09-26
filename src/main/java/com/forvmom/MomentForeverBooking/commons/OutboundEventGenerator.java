@@ -62,18 +62,21 @@ public class OutboundEventGenerator {
     private static BookingFailedEvent buildBookingFailedEvent(Booking booking, InboundEvent inboundEvent) {
 
         if(booking==null){
-            //create minimal event with bookingId and failure reason
-                BookingFailedEvent bookingFailedEvent = new BookingFailedEvent();
-                applyIdentity(bookingFailedEvent, EventConstants.BOOKING_FAILED,
-                        inboundEvent.getBookingId(), inboundEvent);
-                bookingFailedEvent.setBookingId(inboundEvent.getBookingId());
-                if (inboundEvent instanceof BookingRequestEvent) {
-                    bookingFailedEvent.setBookingDate(
-                            ((BookingRequestEvent) inboundEvent).getBookingDate());
-                }
-                bookingFailedEvent.setFailedAt(LocalDateTime.now());
-                bookingFailedEvent.setFailureReason("Booking not found for id: " + inboundEvent.getBookingId());
-                return bookingFailedEvent;
+            BookingFailedEvent bookingFailedEvent = new BookingFailedEvent();
+            applyIdentity(bookingFailedEvent, EventConstants.BOOKING_FAILED,
+                    inboundEvent.getBookingId(), inboundEvent);
+            bookingFailedEvent.setBookingId(inboundEvent.getBookingId());
+            if (inboundEvent instanceof BookingRequestEvent requestEvent) {
+                bookingFailedEvent.setUserId(requestEvent.getUserId());
+                bookingFailedEvent.setUserEmail(requestEvent.getUserEmail());
+                bookingFailedEvent.setExperienceId(requestEvent.getExperienceId());
+                bookingFailedEvent.setTimeSlotMapperId(requestEvent.getTimeSlotMapperId());
+                bookingFailedEvent.setGuestCount(requestEvent.getGuestCount());
+                bookingFailedEvent.setBookingDate(requestEvent.getBookingDate());
+            }
+            bookingFailedEvent.setFailedAt(LocalDateTime.now());
+            bookingFailedEvent.setFailureReason("Booking not found for id: " + inboundEvent.getBookingId());
+            return bookingFailedEvent;
         }
         BookingFailedEvent bookingFailedEvent = new BookingFailedEvent();
         applyIdentity(bookingFailedEvent, EventConstants.BOOKING_FAILED, booking.getBookingId(), inboundEvent);
@@ -91,17 +94,44 @@ public class OutboundEventGenerator {
         return bookingFailedEvent;
     }
 
+    public static BookingFailedEvent buildDeadPaymentRequestFailure(
+            Booking booking,
+            String failureReason,
+            String causationId) {
+        BookingFailedEvent event = new BookingFailedEvent();
+        applyIdentity(event, EventConstants.BOOKING_FAILED, booking.getBookingId(),
+                booking.getBookingId(), causationId);
+        event.setBookingId(booking.getBookingId());
+        event.setFailedAt(LocalDateTime.now());
+        event.setFailureReason(failureReason);
+        event.setUserId(booking.getUserId());
+        event.setUserEmail(booking.getUserEmail());
+        event.setExperienceId(booking.getExperienceId());
+        event.setTimeSlotMapperId(booking.getTimeSlotMapperId());
+        event.setGuestCount(booking.getGuestCount());
+        if (booking.getBookingDate() != null) {
+            event.setBookingDate(booking.getBookingDate().toLocalDate());
+        }
+        return event;
+    }
+
     private static void applyIdentity(BaseEvent event, String eventType, String bookingId,
                                       InboundEvent inboundEvent) {
+        applyIdentity(event, eventType, bookingId,
+                inboundEvent.getCorrelationId(), inboundEvent.getEventId());
+    }
+
+    private static void applyIdentity(BaseEvent event, String eventType, String bookingId,
+                                      String correlationId, String causationId) {
         Instant now = Instant.now();
         event.setEventId(UUID.randomUUID().toString());
         event.setProducer(PRODUCER);
         event.setSchemaVersion(SCHEMA_VERSION);
         event.setOccurredAt(now);
         event.setEventType(eventType);
-        event.setCorrelationId(inboundEvent.getCorrelationId() != null
-                ? inboundEvent.getCorrelationId()
+        event.setCorrelationId(correlationId != null
+                ? correlationId
                 : bookingId);
-        event.setCausationId(inboundEvent.getEventId());
+        event.setCausationId(causationId);
     }
 }

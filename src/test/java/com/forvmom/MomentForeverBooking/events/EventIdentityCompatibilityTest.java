@@ -111,12 +111,16 @@ class EventIdentityCompatibilityTest {
         BookingRequestEvent inbound = new BookingRequestEvent();
         inbound.setBookingId("B-100");
         inbound.setBookingDate(LocalDate.of(2026, 8, 22));
+        inbound.setTimeSlotMapperId(300L);
+        inbound.setGuestCount(2);
 
         BookingFailedEvent derived = (BookingFailedEvent)
                 OutboundEventGenerator.buildOutboundEvent(
                         null, EventConstants.BOOKING_FAILED, inbound);
 
         assertEquals(LocalDate.of(2026, 8, 22), derived.getBookingDate());
+        assertEquals(300L, derived.getTimeSlotMapperId());
+        assertEquals(2, derived.getGuestCount());
     }
 
     private Booking booking(String bookingId) {

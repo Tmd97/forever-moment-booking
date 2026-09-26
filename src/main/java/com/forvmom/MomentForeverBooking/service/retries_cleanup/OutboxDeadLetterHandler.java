@@ -2,14 +2,11 @@ package com.forvmom.MomentForeverBooking.service.retries_cleanup;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.forvmom.MomentForeverBooking.commons.EventConstants;
-import com.forvmom.MomentForeverBooking.commons.OutboundEventGenerator;
 import com.forvmom.MomentForeverBooking.domain.entity.InboundOutbox;
 import com.forvmom.MomentForeverBooking.domain.entity.OutgoingOutboxRecord;
-import com.forvmom.MomentForeverBooking.events.BookingFailedEvent;
 import com.forvmom.MomentForeverBooking.events.BookingRequestEvent;
 import com.forvmom.MomentForeverBooking.events.PaymentProcessedEvent;
 import com.forvmom.MomentForeverBooking.service.InboundOutboxService;
-import com.forvmom.MomentForeverBooking.service.OutgoingOutboxService;
 import com.forvmom.MomentForeverBooking.service.alerts.AlertService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,40 +20,31 @@ public class OutboxDeadLetterHandler {
     private static final Logger log = LoggerFactory.getLogger(OutboxDeadLetterHandler.class);
 
     private final InboundOutboxService inboundOutboxService;
-    private final OutgoingOutboxService outgoingOutboxService;
-    private final OutgoingOutboxPublisher outgoingOutboxPublisher;
+    private final InboundDeadLetterCompensationService compensationService;
     private final AlertService alertService;
     private final ObjectMapper objectMapper;
 
     public OutboxDeadLetterHandler(InboundOutboxService inboundOutboxService,
-                                   OutgoingOutboxService outgoingOutboxService,
-                                   OutgoingOutboxPublisher outgoingOutboxPublisher,
+                                   InboundDeadLetterCompensationService compensationService,
                                    AlertService alertService,
                                    ObjectMapper objectMapper) {
         this.inboundOutboxService = inboundOutboxService;
-        this.outgoingOutboxService = outgoingOutboxService;
-        this.outgoingOutboxPublisher = outgoingOutboxPublisher;
+        this.compensationService = compensationService;
         this.alertService = alertService;
         this.objectMapper = objectMapper;
     }
 
     public void handleDeadRecord(InboundOutbox outbox) {
-        inboundOutboxService.markAsDead(outbox);
         String bookingId = outbox.getBookingReferenceId();
         String eventType = outbox.getEventType();
 
-        log.error("Record moved to DEAD after max retries: id={}, bookingId={}, eventType={}",
-                outbox.getId(), bookingId, eventType);
-
-        // Always send an alert
-        String alertMsg = String.format(
-                "Incoming outbox record id=%d for booking=%s eventType=%s moved to DEAD after max retries",
-                outbox.getId(), bookingId, eventType);
-        alertService.sendAlert(alertMsg);
-
-        // Attempt compensation based on event type
         try {
             sendCompensationEvent(outbox);
+            log.error("Record moved to DEAD after max retries: id={}, bookingId={}, eventType={}",
+                    outbox.getId(), bookingId, eventType);
+            alertService.sendAlert(String.format(
+                    "Incoming outbox record id=%d for booking=%s eventType=%s moved to DEAD after max retries",
+                    outbox.getId(), bookingId, eventType));
         } catch (Exception e) {
             log.error("Failed to send compensation for dead record id={}, bookingId={}, eventType={}",
                     outbox.getId(), bookingId, eventType, e);
@@ -71,13 +59,18 @@ public class OutboxDeadLetterHandler {
 
         switch (eventType) {
             case EventConstants.BOOKING_REQUESTED:
-                // Booking request could never be processed → send a BOOKING_FAILED event
                 BookingRequestEvent requestEvent = objectMapper.readValue(payload, BookingRequestEvent.class);
-                createAndPublishBookingFailed(requestEvent, "Booking request permanently failed after max retries");
-                log.info("Compensation: BOOKING_FAILED created for dead BOOKING_REQUESTED: bookingId={}", bookingId);
+                OutgoingOutboxRecord compensationRecord =
+                        compensationService.compensateDeadBookingRequest(
+                                outbox,
+                                requestEvent,
+                                "Booking request permanently failed after max retries");
+                log.info("Compensation queued: BOOKING_FAILED outboxId={} for dead BOOKING_REQUESTED bookingId={}",
+                        compensationRecord.getId(), bookingId);
                 break;
 
             case EventConstants.PAYMENT_PROCESSED:
+                inboundOutboxService.markAsDead(outbox);
                 // Payment succeeded but we couldn't confirm the booking → request a refund
                 PaymentProcessedEvent paymentEvent = objectMapper.readValue(payload, PaymentProcessedEvent.class);
                 createRefundRequest(paymentEvent);
@@ -85,6 +78,7 @@ public class OutboxDeadLetterHandler {
                 break;
 
             case EventConstants.PAYMENT_FAILED:
+                inboundOutboxService.markAsDead(outbox);
                 // Payment failed and we couldn't record the failure → maybe send a user notification
                 // For now, just log and alert (manual intervention may be needed)
                 log.warn("Dead PAYMENT_FAILED record for bookingId={} - booking may be stuck in PENDING. Manual check recommended.", bookingId);
@@ -92,22 +86,9 @@ public class OutboxDeadLetterHandler {
                 break;
 
             default:
+                inboundOutboxService.markAsDead(outbox);
                 log.warn("No compensation handler for dead event type: {}", eventType);
         }
-    }
-
-    private void createAndPublishBookingFailed(BookingRequestEvent requestEvent, String reason) {
-        // Use EventMapper to convert BookingRequestEvent -> BookingFailedEvent
-        //TODO: need to send useremail, or experience Id
-        BookingFailedEvent bookingFailedEvent = (BookingFailedEvent) OutboundEventGenerator.buildOutboundEvent(
-                null, EventConstants.BOOKING_FAILED, requestEvent);
-        OutgoingOutboxRecord record = outgoingOutboxService.createRecord(
-                requestEvent.getBookingId(),
-                EventConstants.BOOKING_FAILED,
-                bookingFailedEvent
-        );
-        outgoingOutboxPublisher.trySinglePublish(record);
-        log.info("Created and published BOOKING_FAILED record id={} for dead booking", record.getId());
     }
 
     private void createRefundRequest(PaymentProcessedEvent paymentEvent) {

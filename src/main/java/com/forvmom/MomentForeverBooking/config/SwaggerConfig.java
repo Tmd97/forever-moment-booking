@@ -5,13 +5,17 @@ import org.springdoc.core.models.GroupedOpenApi;
 
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.util.Collections;
 
 @Configuration
 public class SwaggerConfig {
@@ -40,6 +44,23 @@ public class SwaggerConfig {
                 .addSecurityItem(new SecurityRequirement().addList(SECURITY_SCHEME_NAME))
                 .components(new Components()
                         .addSecuritySchemes(SECURITY_SCHEME_NAME, createSecurityScheme()));
+    }
+
+    @Bean
+    public OpenApiCustomizer publicEndpointsNoAuthCustomizer() {
+        return openApi -> {
+            if (openApi.getPaths() == null) {
+                return;
+            }
+            openApi.getPaths().forEach((path, pathItem) -> {
+                if (!path.startsWith("/public/") && !path.startsWith("/auth/")) {
+                    return;
+                }
+                for (Operation operation : pathItem.readOperations()) {
+                    operation.setSecurity(Collections.emptyList());
+                }
+            });
+        };
     }
 
     private SecurityScheme createSecurityScheme() {
