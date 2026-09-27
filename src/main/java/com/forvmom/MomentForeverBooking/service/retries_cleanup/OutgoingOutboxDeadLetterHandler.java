@@ -5,7 +5,6 @@ import com.forvmom.MomentForeverBooking.commons.EventConstants;
 import com.forvmom.MomentForeverBooking.domain.entity.OutgoingOutboxRecord;
 import com.forvmom.MomentForeverBooking.events.BookingConfirmedEvent;
 import com.forvmom.MomentForeverBooking.events.BookingFailedEvent;
-import com.forvmom.MomentForeverBooking.events.PaymentRequestedEvent;
 import com.forvmom.MomentForeverBooking.service.OutgoingOutboxService;
 import com.forvmom.MomentForeverBooking.service.alerts.AlertService;
 import org.slf4j.Logger;
@@ -18,27 +17,32 @@ public class OutgoingOutboxDeadLetterHandler {
     private static final Logger log = LoggerFactory.getLogger(OutgoingOutboxDeadLetterHandler.class);
 
     private final OutgoingOutboxService outgoingOutboxService;
+    private final OutgoingDeadLetterCompensationService compensationService;
     private final AlertService alertService;
     private final ObjectMapper objectMapper;
 
     public OutgoingOutboxDeadLetterHandler(OutgoingOutboxService outgoingOutboxService,
+                                           OutgoingDeadLetterCompensationService compensationService,
                                            AlertService alertService,
                                            ObjectMapper objectMapper) {
         this.outgoingOutboxService = outgoingOutboxService;
+        this.compensationService = compensationService;
         this.alertService = alertService;
         this.objectMapper = objectMapper;
     }
 
     public void handleDeadRecord(OutgoingOutboxRecord record) {
-        outgoingOutboxService.markAsDead(record);
-        String msg = String.format(
-                "Outgoing outbox record id=%d type=%s bookingId=%s moved to DEAD after max retries",
-                record.getId(), record.getEventType(), record.getBookingId());
-        log.error("DEAD: {}", msg);
-        alertService.sendAlert(msg);
-
         try {
-            compensate(record);
+            OutgoingOutboxRecord compensationRecord = compensate(record);
+            String msg = String.format(
+                    "Outgoing outbox record id=%d type=%s bookingId=%s moved to DEAD after max retries",
+                    record.getId(), record.getEventType(), record.getBookingId());
+            log.error("DEAD: {}", msg);
+            alertService.sendAlert(msg);
+            if (compensationRecord != null) {
+                log.info("BOOKING_FAILED compensation queued: outboxId={}, bookingId={}",
+                        compensationRecord.getId(), compensationRecord.getBookingId());
+            }
         } catch (Exception e) {
             log.error("Compensation failed for outgoing dead record id={}", record.getId(), e);
             alertService.sendAlert(String.format(
@@ -48,42 +52,33 @@ public class OutgoingOutboxDeadLetterHandler {
         }
     }
 
-    private void compensate(OutgoingOutboxRecord record) throws Exception {
+    private OutgoingOutboxRecord compensate(OutgoingOutboxRecord record) throws Exception {
         String eventType = record.getEventType();
         String bookingId = record.getBookingId();
         String payload = record.getPayload();
 
         switch (eventType) {
             case EventConstants.PAYMENT_REQUESTED:
-                compensatePaymentRequested(bookingId, payload);
-                break;
+                return compensatePaymentRequested(record);
             case EventConstants.BOOKING_CONFIRMED:
+                outgoingOutboxService.markAsDead(record);
                 compensateBookingConfirmed(bookingId, payload);
                 break;
             case EventConstants.BOOKING_FAILED:
+                outgoingOutboxService.markAsDead(record);
                 compensateBookingFailed(bookingId, payload);
                 break;
             default:
+                outgoingOutboxService.markAsDead(record);
                 log.warn("No compensation handler for outgoing dead event type: {}", eventType);
         }
+        return null;
     }
 
-    private void compensatePaymentRequested(String bookingId, String payload) throws Exception {
-        // Payment request permanently failed – the booking is stuck in PENDING with inventory held.
-        log.warn("PAYMENT_REQUESTED dead letter for bookingId={} – payment service never notified", bookingId);
-        PaymentRequestedEvent event = objectMapper.readValue(payload, PaymentRequestedEvent.class);
-
-        // Option 1: Release inventory (if you have an inventory service)
-        // inventoryService.releaseInventory(event.getExperienceId(), event.getTimeSlotMapperId(), event.getGuestCount());
-
-        // Option 2: Mark booking as FAILED directly (risky but possible)
-        // bookingService.forceFailBooking(bookingId, "Payment request permanently failed");
-
-        // Option 3: Send an alert for manual intervention (what we currently do)
-        alertService.sendAlert(String.format(
-                "MANUAL ACTION NEEDED: Dead PAYMENT_REQUESTED for booking %s – check inventory state",
-                bookingId
-        ));
+    private OutgoingOutboxRecord compensatePaymentRequested(OutgoingOutboxRecord record) {
+        log.warn("PAYMENT_REQUESTED dead letter for bookingId={} – failing booking and releasing inventory",
+                record.getBookingId());
+        return compensationService.compensateDeadPaymentRequest(record).orElse(null);
     }
 
     private void compensateBookingConfirmed(String bookingId, String payload) throws Exception {

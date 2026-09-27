@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 
 public final class JsonUtils {
     private static final Logger log = LoggerFactory.getLogger(JsonUtils.class);
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules();
 
     private JsonUtils() {}
 

@@ -43,7 +43,7 @@ spring:
         enabled: true
         register: true
         service-name: ${spring.application.name}
-        health-check-path: /actuator/health
+        health-check-path: /booking/actuator/health
         health-check-interval: 10s
         instance-id: ${spring.application.name}:${random.value}
         prefer-ip-address: true
@@ -54,7 +54,7 @@ spring:
   # DATABASE - POSTGRESQL
   # ----------------------------------------------------------
   datasource:
-    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:5432/moment_forever_book
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:5433/moment_forever_book?options=-c%20timezone%3DUTC
     username: postgres
     password: groote
     driver-class-name: org.postgresql.Driver
@@ -203,6 +203,7 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     url: /v3/api-docs
+    persist-authorization: true
   api-docs:
     path: /v3/api-docs
 

@@ -35,16 +35,19 @@ public class BookingEventProducer {
 
     public void sendBookingConfirmedEvent(BookingConfirmedEvent event) throws ExecutionException, InterruptedException, TimeoutException {
         kafkaTemplate.send(bookingConfirmedTopic, event.getBookingId(), event).get(5, TimeUnit.SECONDS);
-        log.info("Sent BookingConfirmedEvent: bookingId={}", event.getBookingId());
+        log.info("Sent BookingConfirmedEvent: bookingId={}, eventId={}, correlationId={}",
+                event.getBookingId(), event.getEventId(), event.getCorrelationId());
     }
 
     public void sendBookingFailedEvent(BookingFailedEvent event) throws ExecutionException, InterruptedException, TimeoutException {
         kafkaTemplate.send(bookingFailedTopic, event.getBookingId(), event).get(5, TimeUnit.SECONDS);
-        log.info("Sent BookingFailedEvent: bookingId={}", event.getBookingId());
+        log.info("Sent BookingFailedEvent: bookingId={}, eventId={}, correlationId={}",
+                event.getBookingId(), event.getEventId(), event.getCorrelationId());
     }
 
     public void sendPaymentRequestedEvent(PaymentRequestedEvent event) throws ExecutionException, InterruptedException, TimeoutException {
         kafkaTemplate.send(paymentRequestedTopic, event.getBookingId(), event).get(5, TimeUnit.SECONDS);
-        log.info("Sent PaymentRequestedEvent: bookingId={}", event.getBookingId());
+        log.info("Sent PaymentRequestedEvent: bookingId={}, eventId={}, correlationId={}",
+                event.getBookingId(), event.getEventId(), event.getCorrelationId());
     }
 }

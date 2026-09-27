@@ -1,8 +1,9 @@
 package com.forvmom.MomentForeverBooking.events;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 
-public class BookingFailedEvent implements OutboundEvent {
+public class BookingFailedEvent extends BaseEvent implements OutboundEvent {
 
     private String bookingId;
     private Long userId;
@@ -10,6 +11,7 @@ public class BookingFailedEvent implements OutboundEvent {
     private Long experienceId;
     private Long timeSlotMapperId;
     private Integer guestCount;
+    private LocalDate bookingDate;
     private String failureReason;
     private LocalDateTime failedAt;
 
@@ -62,6 +64,14 @@ public class BookingFailedEvent implements OutboundEvent {
 
     public void setGuestCount(Integer guestCount) {
         this.guestCount = guestCount;
+    }
+
+    public LocalDate getBookingDate() {
+        return bookingDate;
+    }
+
+    public void setBookingDate(LocalDate bookingDate) {
+        this.bookingDate = bookingDate;
     }
 
     public String getFailureReason() {

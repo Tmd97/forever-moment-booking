@@ -6,9 +6,14 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "inbound_outbox", indexes = {
+@Table(name = "inbound_outbox", 
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uq_inbound_outbox_booking_event", columnNames = {"booking_ref_id", "event_type"})
+        },
+        indexes = {
         @Index(name = "idx_inbound_outbox_status_updated", columnList = "status, updated_at"),
-        @Index(name = "idx_inbound_outbox_ref", columnList = "booking_ref_id", unique = true)
+        @Index(name = "idx_inbound_outbox_ref", columnList = "booking_ref_id"),
+        @Index(name = "uq_inbound_outbox_producer_event", columnList = "producer, event_id", unique = true)
 })
 public class InboundOutbox {
 
@@ -16,9 +21,15 @@ public class InboundOutbox {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** e.g. MFB-1735000000000-A3F2 — idempotency key for incoming events */
-    @Column(name = "booking_ref_id", nullable = false, unique = true)
+    /** e.g. MFB-1735000000000-A3F2 — aggregate correlation, not event identity */
+    @Column(name = "booking_ref_id", nullable = false)
     private String bookingReferenceId;
+
+    @Column(name = "producer", length = 100)
+    private String producer;
+
+    @Column(name = "event_id", length = 100)
+    private String eventId;
 
     /** e.g. "BOOKING_REQUESTED" */
     @Column(name = "event_type", nullable = false)
@@ -67,6 +78,22 @@ public class InboundOutbox {
 
     public void setBookingReferenceId(String v) {
         this.bookingReferenceId = v;
+    }
+
+    public String getProducer() {
+        return producer;
+    }
+
+    public void setProducer(String producer) {
+        this.producer = producer;
+    }
+
+    public String getEventId() {
+        return eventId;
+    }
+
+    public void setEventId(String eventId) {
+        this.eventId = eventId;
     }
 
     public String getEventType() {

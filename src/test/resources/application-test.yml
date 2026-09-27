@@ -6,8 +6,32 @@ spring:
     password:
 
   jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: create-drop
 
   kafka:
     bootstrap-servers: localhost:9092
+    admin:
+      auto-create: false
+    listener:
+      auto-startup: false
+
+  quartz:
+    auto-startup: false
+
+  cloud:
+    discovery:
+      enabled: false
+    consul:
+      enabled: false
+      discovery:
+        enabled: false
+        register: false
+
+kafka:
+  topics:
+    booking-requested: test-booking-requested
+    booking-confirmed: test-booking-confirmed
+    booking-failed: test-booking-failed
+    payment-requested: test-payment-requested

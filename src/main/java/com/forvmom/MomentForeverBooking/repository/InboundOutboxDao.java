@@ -22,4 +22,6 @@ public interface InboundOutboxDao extends JpaRepository<InboundOutbox, Long> {
                                                          LocalDateTime cutoff);
 
     Optional<InboundOutbox> findByBookingReferenceIdAndEventType(String bookingReferenceId, String eventType);
+
+    Optional<InboundOutbox> findByProducerAndEventId(String producer, String eventId);
 }

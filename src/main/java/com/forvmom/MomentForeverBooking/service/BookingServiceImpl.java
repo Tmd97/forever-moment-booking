@@ -21,11 +21,14 @@ public class BookingServiceImpl implements BookingService {
     private static final Logger log = LoggerFactory.getLogger(BookingServiceImpl.class);
 
     private final BookingRepository bookingRepository;
+    private final BookingStatusTransitionService bookingStatusTransitionService;
     private final InboundEventProcessorRegistry processorRegistry; // if you still need it
 
     public BookingServiceImpl(BookingRepository bookingRepository,
+                              BookingStatusTransitionService bookingStatusTransitionService,
                               InboundEventProcessorRegistry processorRegistry) {
         this.bookingRepository = bookingRepository;
+        this.bookingStatusTransitionService = bookingStatusTransitionService;
         this.processorRegistry = processorRegistry;
     }
 
@@ -55,19 +58,24 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional
     public void cancelBooking(String bookingId) {
-        Booking booking = getBookingByBookingId(bookingId);
-
-        // Business rules: can only cancel PENDING bookings
-        if (booking.getStatus() == BookingStatus.CANCELLED) {
-            log.info("Booking already cancelled: {}", bookingId);
+        if (bookingStatusTransitionService
+                .transitionPendingBookingToCancelled(bookingId)
+                .isPresent()) {
+            log.info("Booking cancellation won: bookingId={}, currentStatus={}",
+                    bookingId, BookingStatus.CANCELLED);
             return;
         }
-        if (booking.getStatus() != BookingStatus.PENDING) {
+
+        Booking booking = bookingRepository.findByBookingId(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException("Booking not found: " + bookingId));
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            log.info("Booking cancellation skipped idempotently: bookingId={}, currentStatus={}",
+                    bookingId, booking.getStatus());
+            return;
+        }
+        if (booking.getStatus() == BookingStatus.CONFIRMED ||
+                booking.getStatus() == BookingStatus.FAILED) {
             throw new BookingStatusConflictException(bookingId, booking.getStatus().name(), "cancel");
         }
-
-        booking.setStatus(BookingStatus.CANCELLED);
-        bookingRepository.save(booking);
-        log.info("Booking cancelled: {}", bookingId);
     }
 }

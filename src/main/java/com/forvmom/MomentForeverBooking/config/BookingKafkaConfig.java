@@ -49,6 +49,11 @@ public class BookingKafkaConfig {
                 config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
                 config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
                 config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
+                config.put(JsonSerializer.TYPE_MAPPINGS,
+                                "com.forvmom.common.dto.events.BookingConfirmedEvent:" +
+                                                "com.forvmom.MomentForeverBooking.events.BookingConfirmedEvent," +
+                                                                "com.forvmom.common.dto.events.BookingFailedEvent:" +
+                                                                "com.forvmom.MomentForeverBooking.events.BookingFailedEvent");
 
                 // Reliability settings
                 config.put(ProducerConfig.RETRIES_CONFIG, 3);

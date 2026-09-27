@@ -31,8 +31,16 @@ public class Booking {
     @Column(name = "booking_id", nullable = false, unique = true, length = 60)
     private String bookingId; // e.g., MFB-1735000000000-A3F2
 
+
+    @Column(name="booking_date", nullable = false)
+    private LocalDateTime bookingDate;
+
     @Column(name = "user_id", nullable = false)
     private Long userId;
+
+    @Version
+    @Column(name = "version")
+    private Long version;
 
     @Column(name = "user_email", nullable = false, length = 255)
     private String userEmail;
@@ -122,6 +130,14 @@ public class Booking {
     }
 
 
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
+    }
+
     public String getBookingId() {
         return bookingId;
     }
@@ -129,6 +145,15 @@ public class Booking {
     public void setBookingId(String bookingId) {
         this.bookingId = bookingId;
     }
+
+    public LocalDateTime getBookingDate() {
+        return bookingDate;
+    }
+
+    public void setBookingDate(LocalDateTime bookingDate) {
+        this.bookingDate = bookingDate;
+    }
+
 
     public Long getUserId() {
         return userId;

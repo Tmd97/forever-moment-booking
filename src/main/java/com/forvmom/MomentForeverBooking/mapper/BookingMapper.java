@@ -26,6 +26,9 @@ public class BookingMapper {
         booking.setTimeSlotLabel(event.getTimeSlotLabel());
         booking.setStartTime(event.getStartTime());
         booking.setEndTime(event.getEndTime());
+        if (event.getBookingDate() != null) {
+            booking.setBookingDate(event.getBookingDate().atStartOfDay());
+        }
         booking.setGuestCount(event.getGuestCount());
         booking.setStatus(BookingStatus.PENDING);
         booking.setResolvedPricePerPerson(event.getResolvedPricePerPerson());
